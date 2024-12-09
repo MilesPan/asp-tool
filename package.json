@@ -10,7 +10,11 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:asp-tools.runTool"
+    "onCommand:asp-tools.runTool",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:vue",
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {

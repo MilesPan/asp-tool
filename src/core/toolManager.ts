@@ -3,8 +3,8 @@ import { BaseTool } from '../tools/baseTool';
 import { ConfigManager } from './configManager';
 import { CodeChecker } from '../tools/codeChecker/codeChecker';
 
-export class ToolManager {
-    private tools: Map<string, BaseTool> = new Map();
+export class ToolManager implements vscode.Disposable {
+    private tools: BaseTool[] = [];
 
     constructor(private configManager: ConfigManager, private context: vscode.ExtensionContext) {}
 
@@ -14,20 +14,29 @@ export class ToolManager {
     }
 
     public registerTool(tool: BaseTool) {
-        this.tools.set(tool.name, tool);
+        this.tools.push(tool);
         tool.setActivationEvents(this.context);
     }
 
     public getToolNames(): string[] {
-        return Array.from(this.tools.keys());
+        return this.tools.map(tool => tool.name);
     }
 
     public async runTool(toolName: string) {
-        const tool = this.tools.get(toolName);
+        const tool = this.tools.find(tool => tool.name === toolName);
         if (tool) {
             await tool.run();
         } else {
             vscode.window.showErrorMessage(`Tool "${toolName}" not found.`);
+        }
+    }
+
+    public dispose() {
+        // 清理所有工具
+        for (const tool of this.tools) {
+            if ('dispose' in tool) {
+                (tool as any).dispose();
+            }
         }
     }
 }

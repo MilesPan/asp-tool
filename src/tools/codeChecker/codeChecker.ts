@@ -2,18 +2,24 @@ import * as vscode from 'vscode';
 import { BaseTool } from '../baseTool';
 import { ConfigManager } from '../../core/configManager';
 import { BaseRule } from './rules/baseRule';
-import { ExampleRule } from './rules/exampleRule';
+import { CssShorthand } from './rules/cssShorthand';
+import { IfBraces } from './rules/ifBraces';
+import { VForKey } from './rules/vForKey';
 
 export class CodeChecker extends BaseTool {
     private rules: BaseRule[] = [];
+    private diagnosticCollection: vscode.DiagnosticCollection;
 
     constructor(configManager: ConfigManager) {
-        super('Code Checker', configManager, ['onLanguage:javascript', 'onLanguage:typescript', 'onStartupFinished']);
+        super('Code Checker', configManager, ['onLanguage:javascript', 'onLanguage:typescript', 'onStartupFinished', 'onLanguage:vue']);
         this.initializeRules();
+        this.diagnosticCollection = vscode.languages.createDiagnosticCollection('codeChecker');
     }
 
     private initializeRules() {
-        this.rules.push(new ExampleRule());
+        this.rules.push(new CssShorthand());
+        this.rules.push(new IfBraces());
+        this.rules.push(new VForKey());
         // 在这里添加更多规则
     }
 
@@ -22,7 +28,6 @@ export class CodeChecker extends BaseTool {
         if (!editor) {
             return;
         }
-
         const document = editor.document;
         const diagnostics: vscode.Diagnostic[] = [];
 
@@ -38,8 +43,11 @@ export class CodeChecker extends BaseTool {
             }
         }
 
-        const collection = vscode.languages.createDiagnosticCollection('codeChecker');
-        collection.set(document.uri, diagnostics);
+        this.diagnosticCollection.set(document.uri, diagnostics);
+    }
+
+    public dispose() {
+        this.diagnosticCollection.dispose();
     }
 }
 

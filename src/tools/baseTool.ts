@@ -18,6 +18,7 @@ export abstract class BaseTool {
                 context.subscriptions.push(
                     vscode.workspace.onDidChangeTextDocument((e) => {
                         if (e.document.languageId === language) {
+                            console.log('onDidChangeTextDocument', e.document.languageId, language)
                             this.run();
                         }
                     })
