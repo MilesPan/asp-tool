@@ -5,6 +5,8 @@ import { BaseRule } from './rules/baseRule';
 import { CssShorthand } from './rules/cssShorthand';
 import { IfBraces } from './rules/ifBraces';
 import { VForKey } from './rules/vForKey';
+import { BaseDecrations } from '../baseDecrations';
+import { NoUseCode } from './rules/noUseCode';
 
 export class CodeChecker extends BaseTool {
     private rules: BaseRule[] = [];
@@ -20,7 +22,7 @@ export class CodeChecker extends BaseTool {
         this.rules.push(new CssShorthand());
         this.rules.push(new IfBraces());
         this.rules.push(new VForKey());
-        // 在这里添加更多规则
+        this.rules.push(new NoUseCode());
     }
 
     public async run(): Promise<void> {
@@ -30,6 +32,9 @@ export class CodeChecker extends BaseTool {
         }
         const document = editor.document;
         const diagnostics: vscode.Diagnostic[] = [];
+        const messages: string[] = [];
+
+        this.clearDecorations(editor);
 
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.lineAt(i);
@@ -39,14 +44,20 @@ export class CodeChecker extends BaseTool {
                     const range = new vscode.Range(i, violation.start, i, violation.end);
                     const diagnostic = new vscode.Diagnostic(range, violation.message, vscode.DiagnosticSeverity.Warning);
                     diagnostics.push(diagnostic);
+                    messages.push(violation.message);
                 }
             }
         }
 
         this.diagnosticCollection.set(document.uri, diagnostics);
+        
+        if (diagnostics.length > 0) {
+            this.applyDecorations(editor, diagnostics, messages);
+        }
     }
 
     public dispose() {
+        super.dispose();
         this.diagnosticCollection.dispose();
     }
 }
