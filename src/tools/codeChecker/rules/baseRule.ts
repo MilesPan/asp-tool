@@ -5,6 +5,7 @@ export interface Violation {
     start: number;
     end: number;
     message: string;
+    type?: vscode.DiagnosticSeverity;
 }
 
 export abstract class BaseRule {

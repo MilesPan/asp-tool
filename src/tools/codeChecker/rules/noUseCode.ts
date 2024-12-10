@@ -1,4 +1,4 @@
-import { TextDocument } from "vscode";
+import { DiagnosticSeverity, TextDocument } from "vscode";
 import { BaseRule, Violation } from "./baseRule";
 import { isInTemplate } from "../../../utils/parse";
 
@@ -31,6 +31,8 @@ export class NoUseCode extends BaseRule {
     // 2. 如果是CSS文件中的样式，则检查无用的属性
     this.checkUselessCssProperties(lineText);
 
+    // 3. 检查是否有console.xxx这类调试代码
+    this.checkConsoleCode(lineText);
     return this.violations;
   }
 
@@ -104,4 +106,19 @@ export class NoUseCode extends BaseRule {
     const trimmedValue = value.trim();
     return zeroWithUnitPattern.test(trimmedValue);
   }
+
+  private checkConsoleCode(lineText: string) {
+    // 只匹配 console.xxx 这类调试代码
+    const consolePattern = /console\./;
+    const match = lineText.match(consolePattern);
+    if (match) {
+      this.violations.push({
+        start: match.index!,
+        end: lineText.length,
+        message: "记得删除调试代码",
+        type: DiagnosticSeverity.Information
+      });
+    }
+  }
 }
+

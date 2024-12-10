@@ -5,8 +5,8 @@ import { BaseRule } from './rules/baseRule';
 import { CssShorthand } from './rules/cssShorthand';
 import { IfBraces } from './rules/ifBraces';
 import { VForKey } from './rules/vForKey';
-import { BaseDecrations } from '../baseDecrations';
 import { NoUseCode } from './rules/noUseCode';
+import { ImgAlt } from './rules/imgAlt';
 
 export class CodeChecker extends BaseTool {
     private rules: BaseRule[] = [];
@@ -23,6 +23,7 @@ export class CodeChecker extends BaseTool {
         this.rules.push(new IfBraces());
         this.rules.push(new VForKey());
         this.rules.push(new NoUseCode());
+        this.rules.push(new ImgAlt());
     }
 
     public async run(): Promise<void> {
@@ -42,7 +43,7 @@ export class CodeChecker extends BaseTool {
                 const violations = rule.check(line.text, document, i);
                 for (const violation of violations) {
                     const range = new vscode.Range(i, violation.start, i, violation.end);
-                    const diagnostic = new vscode.Diagnostic(range, violation.message, vscode.DiagnosticSeverity.Warning);
+                    const diagnostic = new vscode.Diagnostic(range, violation.message, violation.type || vscode.DiagnosticSeverity.Warning);
                     diagnostics.push(diagnostic);
                     messages.push(violation.message);
                 }
