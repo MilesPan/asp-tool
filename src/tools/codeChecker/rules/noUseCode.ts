@@ -1,6 +1,10 @@
 import { DiagnosticSeverity, TextDocument } from "vscode";
 import { BaseRule, Violation } from "./baseRule";
-import { isInTemplate } from "../../../utils/parse";
+import {
+  getFunctionBody,
+  isInInnerFunction,
+  isInTemplate,
+} from "../../../utils/parse";
 
 type CssProperty = {
   property: string;
@@ -33,6 +37,8 @@ export class NoUseCode extends BaseRule {
 
     // 3. 检查是否有console.xxx这类调试代码
     this.checkConsoleCode(lineText);
+
+    this.checkUselessAsync(lineText, document, lineNumber);
     return this.violations;
   }
 
@@ -107,6 +113,7 @@ export class NoUseCode extends BaseRule {
     return zeroWithUnitPattern.test(trimmedValue);
   }
 
+  // 检查console.xxx这类调试代码
   private checkConsoleCode(lineText: string) {
     // 只匹配 console.xxx 这类调试代码
     const consolePattern = /console\./;
@@ -116,9 +123,51 @@ export class NoUseCode extends BaseRule {
         start: match.index!,
         end: lineText.length,
         message: "记得删除调试代码",
-        type: DiagnosticSeverity.Information
+        type: DiagnosticSeverity.Information,
       });
     }
   }
-}
 
+  // 检查无用的async声明
+  private checkUselessAsync(lineText: string, document: TextDocument, lineNumber: number) {
+    if (!lineText.includes('async')) {
+      return;
+    }
+  
+    const functionBody = getFunctionBody(document, lineNumber);
+    if (!functionBody) return;
+  
+    // 检查当前函数作用域内的await
+    let topLevelAwaitCount = 0;
+    let braceCount = 0;
+  
+    // 遍历函数体内容
+    for (const line of functionBody.content) {
+      // 更新花括号计数
+      const openBraces = (line.match(/{/g) || []).length;
+      const closeBraces = (line.match(/}/g) || []).length;
+      braceCount += openBraces - closeBraces;
+  
+      // 只统计顶层作用域的await（braceCount === 1表示在当前函数的最外层）
+      if (braceCount === 1) {
+        const awaitMatches = line.match(/\bawait\b/g);
+        if (awaitMatches) {
+          topLevelAwaitCount += awaitMatches.length;
+        }
+      }
+    }
+  
+    // 如果当前函数作用域内没有顶层await，则标记为无用async
+    if (topLevelAwaitCount === 0) {
+      const asyncMatch = lineText.match(/\basync\b/);
+      if (asyncMatch) {
+        this.violations.push({
+          start: asyncMatch.index!,
+          end: asyncMatch.index! + 'async'.length,
+          message: "此函数内未使用await，async声明可以删除",
+          type: DiagnosticSeverity.Information
+        });
+      }
+    }
+  }
+}

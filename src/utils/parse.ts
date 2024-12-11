@@ -69,3 +69,108 @@ export function isInStyle(document: TextDocument, lineNumber: number): boolean {
 
   return false;
 }
+
+interface FunctionBodyInfo {
+  startLine: number;
+  endLine: number;
+  content: string[];
+}
+// 获取函数体
+// 获取函数体
+export function getFunctionBody(
+  document: TextDocument,
+  lineNumber: number
+): FunctionBodyInfo | null {
+  let openBraces = 0;
+  let openParens = 0; // 添加括号计数
+  let functionBodyStart = lineNumber;
+  let functionBodyEnd = lineNumber;
+  const content: string[] = [];
+
+  // 向上查找函数声明的开始
+  let currentLine = lineNumber;
+  let foundFunctionStart = false;
+
+  while (currentLine >= 0) {
+    const line = document.lineAt(currentLine).text;
+
+    // 计算括号的变化
+    openParens -= (line.match(/\(/g) || []).length;
+    openParens += (line.match(/\)/g) || []).length;
+
+    // 如果找到async关键字且括号已经闭合（或没有括号），说明找到了函数声明的开始
+    if (line.match(/\basync\s+(function|[\w$]+\s*=|\()/)) {
+      if (openParens <= 0) {
+        functionBodyStart = currentLine;
+        foundFunctionStart = true;
+        break;
+      }
+    }
+    currentLine--;
+  }
+
+  if (!foundFunctionStart) {
+    return null;
+  }
+
+  // 从函数声明开始向下查找函数体
+  let foundBodyStart = false;
+  for (let i = functionBodyStart; i < document.lineCount; i++) {
+    const line = document.lineAt(i).text;
+    content.push(line);
+
+    if (!foundBodyStart) {
+      if (line.includes("{")) {
+        foundBodyStart = true;
+        openBraces = 1;
+      }
+      continue;
+    }
+
+    openBraces += (line.match(/{/g) || []).length;
+    openBraces -= (line.match(/}/g) || []).length;
+
+    if (openBraces === 0) {
+      functionBodyEnd = i;
+      break;
+    }
+  }
+
+  if (!foundBodyStart) {
+    return null;
+  }
+
+  return {
+    startLine: functionBodyStart,
+    endLine: functionBodyEnd,
+    content,
+  };
+}
+
+// 检查某一行是否在内部函数中
+export function isInInnerFunction(
+  line: string,
+  innerFunctionBraces: number,
+  isFirstLine: boolean // 添加参数标识是否是当前检查的函数的第一行
+): { isInner: boolean; bracesChange: number } {
+  let bracesChange = 0;
+
+  // 计算花括号变化
+  if (line.includes("{")) {
+    bracesChange++;
+  }
+  if (line.includes("}")) {
+    bracesChange--;
+  }
+
+  // 检查是否是函数声明
+  const isNewFunction = line.includes("function") || line.includes("=>");
+
+  // 如果是第一行，不算作内部函数
+  // 否则，当前行是函数声明且有开括号，或者已经在内部函数中，就算作内部函数
+  const isInner =
+    !isFirstLine &&
+    ((isNewFunction && line.includes("{")) || innerFunctionBraces > 0);
+
+  return { isInner, bracesChange };
+}
