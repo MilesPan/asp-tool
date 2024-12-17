@@ -1,5 +1,9 @@
 import { DiagnosticSeverity, TextDocument } from "vscode";
 import { BaseRule, Violation } from "./baseRule";
+import { parse } from "@babel/parser";
+// @ts-ignore
+import { parse as vueParse } from "@vue/compiler-sfc/dist/compiler-sfc.esm-browser.js";
+import traverse from "@babel/traverse";
 import {
   getFunctionBody,
   isInInnerFunction,
@@ -129,25 +133,53 @@ export class NoUseCode extends BaseRule {
   }
 
   // 检查无用的async声明
-  private checkUselessAsync(lineText: string, document: TextDocument, lineNumber: number) {
-    if (!lineText.includes('async')) {
+  private async checkUselessAsync(
+    lineText: string,
+    document: TextDocument,
+    lineNumber: number
+  ) {
+    if (!lineText.includes("async")) {
       return;
     }
-  
+    let content = document.getText();
+    let startoffset = 0;
+    if (document.languageId === "vue") {
+      const { descriptor } = vueParse(content);
+      if (descriptor.script) {
+        content = descriptor.script.content;
+        startoffset = descriptor.script.loc.start.line - 1;
+      } else if (descriptor.scriptSetup) {
+        content = descriptor.scriptSetup.content;
+        startoffset = descriptor.scriptSetup.loc.start.line - 1;
+      } else {
+        return;
+      }
+    }
+    const ast = parse(content, {
+      sourceType: "module",
+      plugins: ["typescript"],
+    });
+    traverse(ast, {
+      enter(path) {
+        console.log(path);
+      },
+    });
     const functionBody = getFunctionBody(document, lineNumber);
-    if (!functionBody) return;
-  
+    if (!functionBody) {
+      return;
+    }
+
     // 检查当前函数作用域内的await
     let topLevelAwaitCount = 0;
     let braceCount = 0;
-  
+
     // 遍历函数体内容
     for (const line of functionBody.content) {
       // 更新花括号计数
       const openBraces = (line.match(/{/g) || []).length;
       const closeBraces = (line.match(/}/g) || []).length;
       braceCount += openBraces - closeBraces;
-  
+
       // 只统计顶层作用域的await（braceCount === 1表示在当前函数的最外层）
       if (braceCount === 1) {
         const awaitMatches = line.match(/\bawait\b/g);
@@ -156,16 +188,16 @@ export class NoUseCode extends BaseRule {
         }
       }
     }
-  
+
     // 如果当前函数作用域内没有顶层await，则标记为无用async
     if (topLevelAwaitCount === 0) {
       const asyncMatch = lineText.match(/\basync\b/);
       if (asyncMatch) {
         this.violations.push({
           start: asyncMatch.index!,
-          end: asyncMatch.index! + 'async'.length,
+          end: asyncMatch.index! + "async".length,
           message: "此函数内未使用await，async声明可以删除",
-          type: DiagnosticSeverity.Information
+          type: DiagnosticSeverity.Information,
         });
       }
     }
